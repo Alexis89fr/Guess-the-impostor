@@ -1,31 +1,80 @@
+import { audio } from "../audio.js";
+
 /**
- * Composant de la phase de Jeu (Description & Vote)
+ * Composant de la phase de Jeu (Description & Vote Direct)
  */
 export class GameScreen {
   /**
    * @param {HTMLElement} container - Le conteneur HTML principal.
-   * @param {Array<Object>} assignedRoles - Tableau des joueurs avec leurs rôles { name, isImpostor, word, isEliminated }.
-   * @param {Function} onGameOver - Callback appelé quand le jeu se termine { winner, roles }.
+   * @param {Object} state - L'état global partagé (langue, volume, etc.).
+   * @param {Array<Object>} assignedRoles - Tableau des joueurs avec leurs rôles { name, avatar, isImpostor, word, isEliminated }.
+   * @param {Function} onGameOver - Callback appelé quand le jeu se termine.
+   * @param {Function} onQuit - Callback appelé pour abandonner la partie.
    */
-  constructor(container, assignedRoles, onGameOver) {
+  constructor(container, state, assignedRoles, onGameOver, onQuit) {
     this.container = container;
-    this.players = assignedRoles; // Référence directe pour modifier isEliminated
+    this.state = state;
+    this.players = assignedRoles;
     this.onGameOver = onGameOver;
+    this.onQuit = onQuit;
     
     this.roundNumber = 1;
-    this.phase = "description"; // "description" ou "vote"
-    
     this.selectedPlayerForVote = null; // Index dans this.players
-    this.eliminationResultModal = null; // Données du modal de révélation
+    this.eliminationResultModal = null; // Infos du modal d'élimination
     
     this.startNewRound();
+  }
+
+  /**
+   * Traduit une clé en fonction de la langue courante
+   */
+  t(key) {
+    const lang = this.state.language || "fr";
+    const dict = {
+      fr: {
+        round: "Round",
+        title: "Partie en Cours",
+        instruction: "Parlez à l'oral dans l'ordre ci-dessous, puis votez :",
+        starts: "commence",
+        btnSelect: "Sélectionnez le suspect",
+        btnEliminate: "Éliminer {1}",
+        modalTitle: "Verdict du Vote",
+        modalText: "<strong>{1}</strong> a été éliminé(e) de la table !",
+        roleLabel: "Rôle secret :",
+        impostor: "IMPOSTEUR 🚨",
+        citizen: "CITOYEN 💀",
+        wordLabel: "Son mot secret était :",
+        btnContinue: "Continuer",
+        alive: "En vie",
+        dead: "Éliminé",
+        quitConfirm: "Voulez-vous vraiment quitter la partie en cours ?"
+      },
+      en: {
+        round: "Round",
+        title: "Game in Progress",
+        instruction: "Describe your words in order, then vote:",
+        starts: "starts",
+        btnSelect: "Select the suspect",
+        btnEliminate: "Eliminate {1}",
+        modalTitle: "Vote Verdict",
+        modalText: "<strong>{1}</strong> was eliminated from the table!",
+        roleLabel: "Secret Role:",
+        impostor: "IMPOSTOR 🚨",
+        citizen: "CITIZEN 💀",
+        wordLabel: "Their secret word was:",
+        btnContinue: "Continue",
+        alive: "Alive",
+        dead: "Eliminated",
+        quitConfirm: "Are you sure you want to quit the current game?"
+      }
+    };
+    return dict[lang][key] || key;
   }
 
   /**
    * Initialise un nouveau round : tirage au sort et ordre de passage
    */
   startNewRound() {
-    this.phase = "description";
     this.selectedPlayerForVote = null;
     this.eliminationResultModal = null;
     
@@ -36,9 +85,7 @@ export class GameScreen {
     const randomIndex = Math.floor(Math.random() * alivePlayers.length);
     const startingPlayer = alivePlayers[randomIndex];
     
-    // Déterminer l'ordre de passage à partir de ce joueur
-    // On prend l'ordre initial des joueurs (assis autour de la table)
-    // mais on commence par le joueur tiré au sort et on boucle.
+    // Déterminer l'ordre de passage circulaire
     const startingIndexInFullList = this.players.indexOf(startingPlayer);
     
     this.turnOrder = [];
@@ -49,46 +96,43 @@ export class GameScreen {
         this.turnOrder.push(player);
       }
     }
-    
-    this.currentDescriberIndex = 0; // Index dans this.turnOrder
   }
 
   /**
-   * Rend l'écran de jeu
+   * Rend l'écran de jeu (Vote direct)
    */
   render() {
     this.container.innerHTML = `
       <div class="screen game-screen">
+        <!-- Bouton Quitter (Croix) -->
+        <button class="btn-quit" id="btn-quit-game" title="${this.t("quitConfirm")}">✕</button>
+
         <header class="game-header">
           <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">
-            Round ${this.roundNumber}
+            ${this.t("round")} ${this.roundNumber}
           </p>
-          <h1 class="game-title">Phase de Jeu</h1>
-          <span class="game-phase-indicator" id="phase-badge">
-            ${this.phase === "description" ? "Descriptions" : "Vote de groupe"}
-          </span>
+          <h1 class="game-title">${this.t("title")}</h1>
         </header>
 
-        <!-- Section 1 : Ordre de passage (Descriptions) -->
-        <div class="turn-order-card">
-          <h3 style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 6px;">
-            ${this.phase === "description" ? "Ordre de passage (Décrivez votre mot) :" : "Ordre initial du round :"}
+        <!-- Section 1 : Ordre de passage et descriptions -->
+        <div class="turn-order-card" style="margin-bottom: 16px;">
+          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 2px;">
+            ${this.t("instruction")}
           </h3>
-          <div class="turn-list" id="turn-list-container">
+        </div>
+
+        <!-- Section 2 : Grille des suspects (TRIES PAR ORDRE DE PAROLE) -->
+        <div class="card" style="flex: 1; display: flex; flex-direction: column; padding: 16px; margin-bottom: 16px; min-height: 250px;">
+          <h3 class="vote-section-title">${this.t("title")}</h3>
+          
+          <div class="player-grid" id="game-player-grid">
             <!-- Injecté par JS -->
           </div>
         </div>
 
-        <!-- Section 2 : Zone centrale dynamique -->
-        <div class="card" style="flex: 1; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;">
-          <div id="dynamic-game-area" style="width: 100%; text-align: center;">
-            <!-- Injecté par JS selon la phase -->
-          </div>
-        </div>
-
-        <!-- Bouton d'action principal -->
+        <!-- Bouton d'action d'élimination -->
         <div class="setup-actions" style="margin-top: auto;">
-          <button class="btn btn-primary" id="btn-game-action">
+          <button class="btn btn-primary" id="btn-game-vote">
             <!-- Texte dynamique par JS -->
           </button>
         </div>
@@ -98,157 +142,109 @@ export class GameScreen {
       </div>
     `;
 
-    this.renderTurnList();
-    this.renderDynamicArea();
+    this.renderPlayerGrid();
     this.renderActionButton();
     this.renderModal();
     this.bindEvents();
   }
 
   /**
-   * Rend la liste visuelle de l'ordre de passage
+   * Rend la grille des joueurs suspects triés selon l'ordre de passage circulaire
    */
-  renderTurnList() {
-    const container = document.getElementById("turn-list-container");
-    container.innerHTML = "";
-
-    this.turnOrder.forEach((player, index) => {
-      const badge = document.createElement("span");
-      badge.className = "turn-badge";
-      
-      // États visuels
-      if (this.phase === "description") {
-        if (index === this.currentDescriberIndex) {
-          badge.classList.add("active");
-          badge.innerHTML = `✨ <strong>${player.name}</strong>`;
-        } else if (index < this.currentDescriberIndex) {
-          badge.classList.add("done");
-          badge.innerHTML = `✓ ${player.name}`;
-        } else {
-          badge.textContent = player.name;
-        }
-      } else {
-        // En phase de vote, tout le monde a décrit
-        badge.classList.add("done");
-        badge.textContent = player.name;
-      }
-      
-      container.appendChild(badge);
-    });
-  }
-
-  /**
-   * Rend le contenu central selon la phase
-   */
-  renderDynamicArea() {
-    const area = document.getElementById("dynamic-game-area");
-    
-    if (this.phase === "description") {
-      const activePlayer = this.turnOrder[this.currentDescriberIndex];
-      area.innerHTML = `
-        <div style="animation: zoomIn 0.3s ease-out;">
-          <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 12px;">C'est au tour de :</p>
-          <h2 style="font-size: 2.2rem; font-weight: 800; color: var(--text-primary); margin-bottom: 16px;">
-            ${activePlayer.name}
-          </h2>
-          <div class="avatar-placeholder" style="margin: 0 auto 16px auto; border-style: solid;">
-            ${activePlayer.name.charAt(0).toUpperCase()}
-          </div>
-          <p style="font-size: 0.95rem; max-width: 280px; margin: 0 auto; line-height: 1.4;">
-            Donnez <strong>un seul mot</strong> de description pour votre mot secret, puis passez le téléphone au joueur suivant.
-          </p>
-        </div>
-      `;
-    } else {
-      // Phase de Vote
-      area.innerHTML = `
-        <div style="animation: zoomIn 0.3s ease-out; text-align: left;">
-          <h3 class="vote-section-title">Sélectionnez le suspect à éliminer :</h3>
-          <div class="player-grid" id="vote-grid">
-            <!-- Injecté par JS -->
-          </div>
-        </div>
-      `;
-      this.renderVoteGrid();
-    }
-  }
-
-  /**
-   * Rend la grille des joueurs pour le vote
-   */
-  renderVoteGrid() {
-    const grid = document.getElementById("vote-grid");
+  renderPlayerGrid() {
+    const grid = document.getElementById("game-player-grid");
     grid.innerHTML = "";
 
-    this.players.forEach((player, index) => {
+    // Afficher d'abord les joueurs vivants triés par l'ordre de passage du round
+    this.turnOrder.forEach((player, displayIndex) => {
+      // Trouver l'index original dans la liste complète des joueurs
+      const originalIndex = this.players.indexOf(player);
+      
       const card = document.createElement("div");
       card.className = "player-card";
-      if (player.isEliminated) {
-        card.classList.add("eliminated");
-      }
-      if (this.selectedPlayerForVote === index) {
+      if (this.selectedPlayerForVote === originalIndex) {
         card.classList.add("selected-for-vote");
       }
 
       card.innerHTML = `
         <div class="player-card-info">
           <div class="player-avatar">
-            ${player.name.charAt(0).toUpperCase()}
+            ${
+              player.avatar 
+                ? `<img src="${player.avatar}" alt="${player.name}" />`
+                : player.name.charAt(0).toUpperCase()
+            }
           </div>
-          <span class="player-name">${player.name}</span>
+          <div>
+            <span class="player-name">${player.name}</span>
+            ${
+              displayIndex === 0 
+                ? `<span style="display:block; font-size:0.75rem; color: var(--accent-primary); font-weight:700;">★ ${this.t("starts")}</span>` 
+                : ""
+            }
+          </div>
         </div>
         <div>
-          ${
-            player.isEliminated
-              ? `<span class="player-status-badge dead">Éliminé</span>`
-              : `<span class="player-status-badge alive">En vie</span>`
-          }
+          <span class="player-status-badge alive">${this.t("alive")}</span>
         </div>
       `;
 
-      if (!player.isEliminated) {
-        card.addEventListener("click", () => {
-          this.selectedPlayerForVote = index;
-          this.renderVoteGrid();
-          this.renderActionButton();
-        });
-      }
+      card.addEventListener("click", () => {
+        audio.playClick();
+        this.selectedPlayerForVote = originalIndex;
+        this.renderPlayerGrid();
+        this.renderActionButton();
+      });
 
       grid.appendChild(card);
+    });
+
+    // Ensuite, on ajoute les joueurs déjà éliminés (à la fin de la liste, pour mémoire)
+    this.players.forEach((player, originalIndex) => {
+      if (player.isEliminated) {
+        const card = document.createElement("div");
+        card.className = "player-card eliminated";
+        
+        card.innerHTML = `
+          <div class="player-card-info">
+            <div class="player-avatar">
+              ${
+                player.avatar 
+                  ? `<img src="${player.avatar}" alt="${player.name}" />`
+                  : player.name.charAt(0).toUpperCase()
+              }
+            </div>
+            <span class="player-name">${player.name}</span>
+          </div>
+          <div>
+            <span class="player-status-badge dead">${this.t("dead")}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
     });
   }
 
   /**
-   * Rend le bouton principal en fonction de la phase
+   * Met à jour le texte et l'état du bouton d'élimination
    */
   renderActionButton() {
-    const btn = document.getElementById("btn-game-action");
+    const btn = document.getElementById("btn-game-vote");
     
-    if (this.phase === "description") {
-      if (this.currentDescriberIndex === this.turnOrder.length - 1) {
-        btn.textContent = "Passer au Vote de Groupe";
-      } else {
-        btn.textContent = "Joueur Suivant";
-      }
-      btn.removeAttribute("disabled");
-      btn.className = "btn btn-primary";
+    if (this.selectedPlayerForVote === null) {
+      btn.textContent = this.t("btnSelect");
+      btn.setAttribute("disabled", "true");
+      btn.className = "btn btn-secondary";
     } else {
-      // Phase de Vote
-      if (this.selectedPlayerForVote === null) {
-        btn.textContent = "Sélectionnez un suspect";
-        btn.setAttribute("disabled", "true");
-        btn.className = "btn btn-secondary";
-      } else {
-        const suspect = this.players[this.selectedPlayerForVote];
-        btn.textContent = `Éliminer ${suspect.name}`;
-        btn.removeAttribute("disabled");
-        btn.className = "btn btn-danger";
-      }
+      const suspect = this.players[this.selectedPlayerForVote];
+      btn.textContent = this.t("btnEliminate").replace("{1}", suspect.name);
+      btn.removeAttribute("disabled");
+      btn.className = "btn btn-danger";
     }
   }
 
   /**
-   * Rend le modal d'élimination s'il est actif
+   * Rend le modal de révélation d'élimination
    */
   renderModal() {
     const modalContainer = document.getElementById("modal-container");
@@ -258,63 +254,65 @@ export class GameScreen {
     }
 
     const { name, isImpostor, word } = this.eliminationResultModal;
-    
+    const modalText = this.t("modalText").replace("{1}", name);
+    const roleText = isImpostor ? this.t("impostor") : this.t("citizen");
+
     modalContainer.innerHTML = `
       <div class="modal-overlay">
         <div class="modal-content">
           <div class="modal-icon">
             ${isImpostor ? "🚨" : "💀"}
           </div>
-          <h2 class="modal-title">Verdict du Vote</h2>
-          <p class="modal-text">
-            <strong>${name}</strong> a été éliminé(e) de la table !
-          </p>
-          <div class="card" style="background: rgba(0,0,0,0.2); margin-bottom: 24px; padding: 16px;">
-            <p style="font-size: 0.9rem; margin-bottom: 4px;">Rôle secret :</p>
+          <h2 class="modal-title">${this.t("modalTitle")}</h2>
+          <p class="modal-text">${modalText}</p>
+          
+          <div class="card" style="background: rgba(0,0,0,0.25); margin-bottom: 24px; padding: 16px;">
+            <p style="font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">${this.t("roleLabel")}</p>
             <h3 style="font-size: 1.4rem; font-weight: 800; color: ${isImpostor ? "var(--color-danger)" : "var(--color-success)"}; margin-bottom: 8px;">
-              ${isImpostor ? "IMPOSTEUR" : "CITOYEN"}
+              ${roleText}
             </h3>
-            <p style="font-size: 0.85rem;">Mot qu'il/elle avait : <br/><strong>${word}</strong></p>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 2px;">${this.t("wordLabel")}</p>
+            <p style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">${word}</p>
           </div>
-          <button class="btn btn-primary" id="btn-modal-close">Continuer</button>
+          
+          <button class="btn btn-primary" id="btn-modal-close">${this.t("btnContinue")}</button>
         </div>
       </div>
     `;
 
     document.getElementById("btn-modal-close").addEventListener("click", () => {
+      audio.playClick();
       this.closeModalAndCheckWinConditions();
     });
   }
 
   /**
-   * Liaison générale des événements de l'écran
+   * Liaison des événements principaux de l'écran
    */
   bindEvents() {
-    const btnAction = document.getElementById("btn-game-action");
+    const btnVote = document.getElementById("btn-game-vote");
+    const btnQuit = document.getElementById("btn-quit-game");
+
+    if (btnQuit) {
+      btnQuit.addEventListener("click", () => {
+        audio.playClick();
+        if (confirm(this.t("quitConfirm"))) {
+          this.onQuit();
+        }
+      });
+    }
     
-    btnAction.addEventListener("click", () => {
-      if (this.phase === "description") {
-        if (this.currentDescriberIndex < this.turnOrder.length - 1) {
-          this.currentDescriberIndex++;
-          this.renderTurnList();
-          this.renderDynamicArea();
-          this.renderActionButton();
-        } else {
-          // Passer à la phase de vote
-          this.phase = "vote";
-          this.render();
-        }
-      } else {
-        // Validation du vote
-        if (this.selectedPlayerForVote !== null) {
-          this.eliminatePlayer(this.selectedPlayerForVote);
-        }
+    btnVote.addEventListener("click", () => {
+      if (this.selectedPlayerForVote !== null) {
+        // Déclencher le son de sabre (slash) à l'élimination !
+        audio.playSlash();
+        this.eliminatePlayer(this.selectedPlayerForVote);
       }
     });
   }
 
   /**
-   * Élimine un joueur et prépare le modal de résultat
+   * Élimine le joueur sélectionné et prépare l'affichage du modal
    */
   eliminatePlayer(playerIndex) {
     const player = this.players[playerIndex];
@@ -330,33 +328,32 @@ export class GameScreen {
   }
 
   /**
-   * Ferme le modal et vérifie si le jeu est fini ou s'il faut lancer un nouveau round
+   * Ferme le modal et vérifie les conditions de victoire ou relance un round
    */
   closeModalAndCheckWinConditions() {
     this.eliminationResultModal = null;
     
-    // Calculer le nombre de joueurs en vie
+    // Calculer les joueurs restants en vie
     const alivePlayers = this.players.filter(p => !p.isEliminated);
     const aliveImpostors = alivePlayers.filter(p => p.isImpostor);
     const aliveCitizens = alivePlayers.filter(p => !p.isImpostor);
     
-    // Conditions de victoire :
-    // 1. Les Citoyens gagnent s'il ne reste plus aucun imposteur
+    // Victoire des Citoyens : plus d'imposteur
     if (aliveImpostors.length === 0) {
       this.onGameOver("citizens", this.players);
       return;
     }
     
-    // 2. Les Imposteurs gagnent s'il reste un nombre de Citoyens inférieur ou égal au nombre d'Imposteurs
-    // (Ex: 1 imposteur vs 1 citoyen restants, ou 2 imposteurs vs 2 citoyens. Les citoyens ne peuvent plus gagner à la majorité)
+    // Victoire des Imposteurs : citoyens <= imposteurs
     if (aliveCitizens.length <= aliveImpostors.length) {
       this.onGameOver("impostors", this.players);
       return;
     }
     
-    // Si la partie continue, on commence un nouveau round (nouvel ordre de passage, etc.)
+    // Sinon, relance d'un nouveau tour
     this.roundNumber++;
     this.startNewRound();
     this.render();
   }
 }
+export default GameScreen;
