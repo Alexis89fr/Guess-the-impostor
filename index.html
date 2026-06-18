@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>L'Imposteur - Jeu de Société Mobile</title>
+  
+  <!-- SEO & Social Meta Tags -->
+  <meta name="description" content="Découvrez le jeu de l'Imposteur. Jouez entre amis, décrivez vos mots et démasquez l'imposteur caché parmi vous !">
+  <meta name="theme-color" content="#0d0e12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- PWA Support -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icon.png">
+</head>
+<body>
+  <!-- Fond animé premium avec dégradés de couleurs sombres et lumineuses -->
+  <div class="glow-bg">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+  </div>
+
+  <!-- Conteneur principal de l'application -->
+  <main id="app" class="app-container">
+    <!-- Le contenu de l'application sera injecté dynamiquement par js/app.js -->
+    <div class="loader-container">
+      <div class="loader-spinner"></div>
+      <p class="loader-text">Initialisation du jeu...</p>
+    </div>
+  </main>
+
+  <!-- Script principal -->
+  <script type="module" src="js/app.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then((reg) => console.log('Service Worker enregistré avec succès :', reg.scope))
+          .catch((err) => console.error('Erreur d\'enregistrement du Service Worker :', err));
+      });
+    }
+  </script>
+</body>
+</html>

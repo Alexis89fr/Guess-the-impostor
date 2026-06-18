@@ -1,0 +1,19 @@
+{
+  "name": "L'Imposteur - Jeu de Société",
+  "short_name": "Imposteur",
+  "description": "Découvrez le jeu de l'Imposteur. Jouez entre amis, décrivez vos mots et démasquez l'imposteur caché parmi vous !",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0b0e",
+  "theme_color": "#0d0e12",
+  "orientation": "portrait",
+  "categories": ["games", "social"],
+  "icons": [
+    {
+      "src": "assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
