@@ -250,8 +250,11 @@ export class GameScreen {
     const modalContainer = document.getElementById("modal-container");
     if (!this.eliminationResultModal) {
       modalContainer.innerHTML = "";
+      this.container.classList.remove("modal-open");
       return;
     }
+
+    this.container.classList.add("modal-open");
 
     const { name, isImpostor, word } = this.eliminationResultModal;
     const modalText = this.t("modalText").replace("{1}", name);
