@@ -512,8 +512,6 @@ p {
 
 /* Player lists */
 .player-list-container {
-  max-height: 220px;
-  overflow-y: auto;
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.2);
@@ -678,8 +676,6 @@ p {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);
@@ -926,8 +922,6 @@ p {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  max-height: 240px;
-  overflow-y: auto;
   padding-right: 4px;
 }
 
@@ -1118,8 +1112,6 @@ p {
   border-radius: var(--radius-md);
   padding: 12px;
   margin-bottom: 16px;
-  max-height: 180px;
-  overflow-y: auto;
 }
 
 .roles-list-title {
